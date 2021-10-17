@@ -1,0 +1,22 @@
+{
+  "voices": {
+    "germanSales": {
+      "description": "German male. A simple voice, it sounds like Teleshopping.",
+      "voice": {
+        "languageCode": "de-DE",
+        "name": "de-DE-Wavenet-B"
+      },
+      "audioConfig": {
+        "pitch": -4,
+        "speakingRate": 1
+      }
+    },
+    "tikTok": {
+      "description": "English female. Sounds like classic Google TTS.",
+      "voice": {
+        "languageCode": "en-US",
+        "name": "en-US-Wavenet-F"
+      }
+    }
+  }
+}
