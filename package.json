@@ -1,5 +1,9 @@
 {
-  "private": true,
+  "name": "tts",
+  "version": "0.1.0",
+  "description": "A bad CLI for the GCP TTS API",
+  "license": "MIT",
+  "author": "hermann-stanew@invita.gmbh",
   "type": "module",
   "scripts": {
     "start": "node code.js",
