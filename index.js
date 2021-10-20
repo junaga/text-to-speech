@@ -1,4 +1,5 @@
 import { TextToSpeechClient } from "@google-cloud/text-to-speech"
+import { SpeechMarkdown } from "speechmarkdown-js"
 import { Command } from "commander"
 import { argv } from "process"
 import fs from "fs-extra"
@@ -11,30 +12,36 @@ const ENCODINGS = {
   mp3: "MP3",
   wav: "LINEAR16"
 }
+const SMD_OPTIONS = { platform: "google-assistant" }
 
 async function textToSpeech(input, output, opts) {
   const format = opts.wav ? "wav" : "mp3"
-  const client = new TextToSpeechClient()
 
+  // Read the voice config
   const config = await fs.readJSON(join(DIR, CONFIG_FILE))
   const { voice, audioConfig = {} } = config.voices[opts.voice]
   audioConfig.audioEncoding = ENCODINGS[format]
 
   const files = await fs.readdir(input)
-  const textFiles = files.filter((file) => file.endsWith(".txt"))
+  const smdFiles = files.filter((file) => file.endsWith(".smd"))
   await fs.emptyDir(output)
   const extension = "." + format
 
-  let requests = []
-  for (const file of textFiles) {
-    const inputPath = join(input, file)
-    const outputPath = join(output, file.replace(/.txt$/, extension))
+  const client = new TextToSpeechClient()
+  const speechMarkdown = new SpeechMarkdown()
 
-    const text = await fs.readFile(inputPath, { encoding: "UTF-8" })
-    const request = { input: { text }, voice, audioConfig }
+  let requests = []
+  for (const file of smdFiles) {
+    const inputPath = join(input, file)
+    const outputPath = join(output, file.replace(/.smd$/, extension))
+
+    const smd = await fs.readFile(inputPath, { encoding: "UTF-8" })
+    const ssml = speechMarkdown.toSSML(smd, SMD_OPTIONS)
+    const request = { input: { ssml }, voice, audioConfig }
 
     const writeSpeech = async (response) => {
       const speech = response[0].audioContent
+      console.debug(outputPath)
       await fs.outputFile(outputPath, speech)
     }
     const speaking = client.synthesizeSpeech(request).then(writeSpeech)
