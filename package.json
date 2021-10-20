@@ -13,7 +13,8 @@
     "@google-cloud/text-to-speech": "^3.3.1",
     "commander": "^8.2.0",
     "fs-extra": "^10.0.0",
-    "prettier": "^2.4.1"
+    "prettier": "^2.4.1",
+    "speechmarkdown-js": "^1.9.0"
   },
   "prettier": {
     "semi": false,
