@@ -2,8 +2,10 @@ import { TextToSpeechClient } from "@google-cloud/text-to-speech"
 import { Command } from "commander"
 import { argv } from "process"
 import fs from "fs-extra"
-import { join as pathJoin } from "path"
+import { join, dirname } from "path"
+import { fileURLToPath } from "url"
 
+const DIR = dirname(fileURLToPath(import.meta.url))
 const CONFIG_FILE = "./config.json"
 const ENCODINGS = {
   mp3: "MP3",
@@ -14,7 +16,7 @@ async function textToSpeech(input, output, opts) {
   const format = opts.wav ? "wav" : "mp3"
   const client = new TextToSpeechClient()
 
-  const config = await fs.readJSON(CONFIG_FILE)
+  const config = await fs.readJSON(join(DIR, CONFIG_FILE))
   const { voice, audioConfig = {} } = config.voices[opts.voice]
   audioConfig.audioEncoding = ENCODINGS[format]
 
@@ -25,8 +27,8 @@ async function textToSpeech(input, output, opts) {
 
   let requests = []
   for (const file of textFiles) {
-    const inputPath = pathJoin(input, file)
-    const outputPath = pathJoin(output, file.replace(/.txt$/, extension))
+    const inputPath = join(input, file)
+    const outputPath = join(output, file.replace(/.txt$/, extension))
 
     const text = await fs.readFile(inputPath, { encoding: "UTF-8" })
     const request = { input: { text }, voice, audioConfig }
@@ -70,7 +72,7 @@ function runCli({ name, version, description }) {
 }
 
 async function main() {
-  const pkgJSON = await fs.readJSON("./package.json")
+  const pkgJSON = await fs.readJSON(join(DIR, "package.json"))
   const { args, opts } = runCli(pkgJSON)
   const [input, output] = args
 
