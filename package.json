@@ -6,7 +6,7 @@
   "author": "hermann-stanew@invita.gmbh",
   "type": "module",
   "scripts": {
-    "start": "node code.js",
+    "test": "node index.js --wav sample/ dist/",
     "fmt": "prettier --write ./"
   },
   "dependencies": {

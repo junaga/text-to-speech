@@ -1,32 +1,80 @@
 import { TextToSpeechClient } from "@google-cloud/text-to-speech"
-import { emptyDir, outputFile } from "fs-extra"
-const DIR = "dist/"
+import { Command } from "commander"
+import { argv } from "process"
+import fs from "fs-extra"
+import { join as pathJoin } from "path"
 
-async function synthesize(text) {
+const CONFIG_FILE = "./config.json"
+const ENCODINGS = {
+  mp3: "MP3",
+  wav: "LINEAR16"
+}
+
+async function textToSpeech(input, output, opts) {
+  const format = opts.wav ? "wav" : "mp3"
   const client = new TextToSpeechClient()
 
-  // Format the request
-  const request = {
-    input: { text },
-    // https://cloud.google.com/text-to-speech/docs/voices
-    voice: { languageCode: "en-US", name: "en-US-Wavenet-F" },
-    audioConfig: { audioEncoding: "MP3" } // "LINEAR16" or "OGG_OPUS"
+  const config = await fs.readJSON(CONFIG_FILE)
+  const { voice, audioConfig = {} } = config.voices[opts.voice]
+  audioConfig.audioEncoding = ENCODINGS[format]
+
+  const files = await fs.readdir(input)
+  const textFiles = files.filter((file) => file.endsWith(".txt"))
+  await fs.emptyDir(output)
+  const extension = "." + format
+
+  let requests = []
+  for (const file of textFiles) {
+    const inputPath = pathJoin(input, file)
+    const outputPath = pathJoin(output, file.replace(/.txt$/, extension))
+
+    const text = await fs.readFile(inputPath, { encoding: "UTF-8" })
+    const request = { input: { text }, voice, audioConfig }
+
+    const writeSpeech = async (response) => {
+      const speech = response[0].audioContent
+      await fs.outputFile(outputPath, speech)
+    }
+    const speaking = client.synthesizeSpeech(request).then(writeSpeech)
+    requests.push(speaking)
   }
 
-  // Run the request
-  const [response] = await client.synthesizeSpeech(request)
-  const speech = response.audioContent
+  await Promise.all(requests)
+}
 
-  return speech
+/**
+ * Does NOT return and stops the thread IF:
+ *  -V, --version
+ *  -h, --help
+ * is given.
+ * @param {Object} pkgJSON
+ * @returns {Object}
+ */
+function runCli({ name, version, description }) {
+  const command = new Command()
+
+  // Define the interface
+  command.name(name).version(version).description(description)
+  command.argument("<input>", "directory with .txt files")
+  command.argument("<output>", "directory for .mp3 files")
+  command.option("-v, --voice <voice>", "to use", "germanSales")
+  command.option("--wav", "output lossless .wav instead of .mp3")
+
+  // Parse the raw `process.argv`
+  command.parse(argv)
+  const args = command.args
+  const opts = command.opts()
+
+  // console.debug("Parsed CLI args: ", { args, opts })
+  return { args, opts }
 }
 
 async function main() {
-  const text = "This is a synthetic voice, it actually sounds kinda awesome"
-  const output = DIR + "speech.mp3"
+  const pkgJSON = await fs.readJSON("./package.json")
+  const { args, opts } = runCli(pkgJSON)
+  const [input, output] = args
 
-  const speech = await synthesize(text)
-  await emptyDir(DIR)
-  await outputFile(output, speech)
+  await textToSpeech(input, output, opts)
 }
 
 main()
