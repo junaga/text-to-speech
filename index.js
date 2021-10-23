@@ -1,10 +1,13 @@
+#!/usr/bin/env node
+
+import { argv } from "process"
+import { join, dirname } from "path"
+import { fileURLToPath } from "url"
+import fs from "fs-extra"
+
 import { TextToSpeechClient } from "@google-cloud/text-to-speech"
 import { SpeechMarkdown } from "speechmarkdown-js"
 import { Command } from "commander"
-import { argv } from "process"
-import fs from "fs-extra"
-import { join, dirname } from "path"
-import { fileURLToPath } from "url"
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const CONFIG_FILE = "./config.json"
