@@ -1,9 +1,14 @@
 {
-  "name": "tts",
+  "name": "@junaga/tts",
   "version": "0.1.0",
-  "description": "A bad CLI for the GCP TTS API",
+  "description": "A simple CLI around `@google-cloud/text-to-speech`, with support for \"Speech Markdown\"",
   "license": "MIT",
-  "author": "hermann-stanew@invita.gmbh",
+  "author": "junaga <hermann-stanew@invita.gmbh>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/junaga/text-to-speech.git"
+  },
+  "bin": "./index.js",
   "type": "module",
   "scripts": {
     "test": "node index.js --wav sample/ dist/",
