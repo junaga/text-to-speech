@@ -1,6 +1,6 @@
 {
   "name": "@junaga/tts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A simple CLI around `@google-cloud/text-to-speech`, with support for \"Speech Markdown\"",
   "license": "MIT",
   "author": "junaga <hermann-stanew@invita.gmbh>",
