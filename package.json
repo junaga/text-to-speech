@@ -11,7 +11,7 @@
   "bin": "./index.js",
   "type": "module",
   "scripts": {
-    "test": "node index.js --wav sample/ dist/",
+    "test": "node index.js --wav --voice tikTok sample/ dist/",
     "fmt": "prettier --write ./"
   },
   "dependencies": {
