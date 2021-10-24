@@ -1,50 +1,87 @@
+#!/usr/bin/env node
+
+import { argv } from "process"
+import { join, dirname } from "path"
+import { fileURLToPath } from "url"
+import fs from "fs-extra"
+
 import { TextToSpeechClient } from "@google-cloud/text-to-speech"
 import { SpeechMarkdown } from "speechmarkdown-js"
 import { Command } from "commander"
-import { argv } from "process"
-import fs from "fs-extra"
-import { join, dirname } from "path"
-import { fileURLToPath } from "url"
 
-const DIR = dirname(fileURLToPath(import.meta.url))
+const THIS_DIR = dirname(fileURLToPath(import.meta.url))
 const CONFIG_FILE = "./config.json"
-const ENCODINGS = {
+const INPUT_EXTENSIONS = ["txt", "smd", "ssml"] // must be UTF-8 encoding
+// https://cloud.google.com/text-to-speech/docs/reference/rest/v1/text/synthesize#audioencoding
+const ENCODINGS_BY_EXTENSION = {
   mp3: "MP3",
   wav: "LINEAR16"
 }
-const SMD_OPTIONS = { platform: "google-assistant" }
+// https://github.com/speechmarkdown/speechmarkdown-js#options
+const SPEECH_MARKDOWN_OPTIONS = {
+  includeFormatterComment: true,
+  platform: "google-assistant"
+}
 
-async function textToSpeech(input, output, opts) {
-  const format = opts.wav ? "wav" : "mp3"
+/**
+ * @param {string} input directory
+ * @param {string} output directory
+ * @param {Object} options parsed from the CLI
+ * @returns {Promise<void>}
+ */
+async function textToSpeech(input, output, options) {
+  // Parse `options`
+  const audioFormat = options.wav ? "wav" : "mp3"
+  const config = await fs.readJSON(join(THIS_DIR, CONFIG_FILE))
+  const { voice, audioConfig = {} } = config.voices[options.voice]
+  audioConfig.audioEncoding = ENCODINGS_BY_EXTENSION[audioFormat]
 
-  // Read the voice config
-  const config = await fs.readJSON(join(DIR, CONFIG_FILE))
-  const { voice, audioConfig = {} } = config.voices[opts.voice]
-  audioConfig.audioEncoding = ENCODINGS[format]
-
-  const files = await fs.readdir(input)
-  const smdFiles = files.filter((file) => file.endsWith(".smd"))
+  // Prepare filesystem
+  const allFiles = await fs.readdir(input)
+  const inputFiles = allFiles.filter((file) => {
+    const extension = file.split(".").pop()
+    const accepted = INPUT_EXTENSIONS.includes(extension)
+    return accepted
+  })
   await fs.emptyDir(output)
-  const extension = "." + format
 
+  // init libraries
   const client = new TextToSpeechClient()
-  const speechMarkdown = new SpeechMarkdown()
+  const speechMarkdown = new SpeechMarkdown(SPEECH_MARKDOWN_OPTIONS)
 
   let requests = []
-  for (const file of smdFiles) {
-    const inputPath = join(input, file)
-    const outputPath = join(output, file.replace(/.smd$/, extension))
+  for (const fileName of inputFiles) {
+    const [name, extension] = fileName.split(".")
 
-    const smd = await fs.readFile(inputPath, { encoding: "UTF-8" })
-    const ssml = speechMarkdown.toSSML(smd, SMD_OPTIONS)
-    const request = { input: { ssml }, voice, audioConfig }
+    // 1:1 text file to audio file
+    const inputPath = join(input, fileName)
+    const outputPath = join(output, name + "." + audioFormat)
 
-    const writeSpeech = async (response) => {
-      const speech = response[0].audioContent
-      console.debug(outputPath)
-      await fs.outputFile(outputPath, speech)
+    // Craft the request object
+    const file = await fs.readFile(inputPath, { encoding: "UTF-8" })
+    let text, isSsml
+    if (extension === "txt") {
+      text = file
+      isSsml = false
+    } else if (extension === "smd") {
+      text = speechMarkdown.toSSML(file)
+      isSsml = true
+    } else if (extension === "ssml") {
+      text = file
+      isSsml = true
     }
-    const speaking = client.synthesizeSpeech(request).then(writeSpeech)
+    const request = {
+      input: { [isSsml ? "ssml" : "text"]: text },
+      voice,
+      audioConfig
+    }
+
+    const writeAudio = async (response) => {
+      const speech = response[0].audioContent
+      await fs.outputFile(outputPath, speech)
+      console.debug(outputPath)
+    }
+    const speaking = client.synthesizeSpeech(request).then(writeAudio)
     requests.push(speaking)
   }
 
@@ -55,22 +92,20 @@ async function textToSpeech(input, output, opts) {
  * Does NOT return and stops the thread IF:
  *  -V, --version
  *  -h, --help
- * is given.
- * @param {Object} pkgJSON
- * @returns {Object}
+ * was given.
  */
-function runCli({ name, version, description }) {
+function runCli({ name: pkgName, version, description }, rawArgs) {
+  const binName = pkgName.split("/").pop() // Remove package scope
   const command = new Command()
 
   // Define the interface
-  command.name(name).version(version).description(description)
-  command.argument("<input>", "directory with .txt files")
+  command.name(binName).version(version).description(description)
+  command.argument("<input>", "directory with .txt, .smd or .ssml files")
   command.argument("<output>", "directory for .mp3 files")
   command.option("-v, --voice <voice>", "to use", "germanSales")
   command.option("--wav", "output lossless .wav instead of .mp3")
 
-  // Parse the raw `process.argv`
-  command.parse(argv)
+  command.parse(rawArgs)
   const args = command.args
   const opts = command.opts()
 
@@ -79,10 +114,9 @@ function runCli({ name, version, description }) {
 }
 
 async function main() {
-  const pkgJSON = await fs.readJSON(join(DIR, "package.json"))
-  const { args, opts } = runCli(pkgJSON)
+  const pkgJSON = await fs.readJSON(join(THIS_DIR, "package.json"))
+  const { args, opts } = runCli(pkgJSON, argv)
   const [input, output] = args
-
   await textToSpeech(input, output, opts)
 }
 
